@@ -60,12 +60,14 @@ func init() {
 	opensslCmd.PersistentFlags().StringVarP(&oc.Ifname, "ifname", "i", "", "(TC Classifier) Interface name on which the probe will be attached.")
 	opensslCmd.PersistentFlags().Uint16Var(&oc.Port, "port", 443, "port number to capture, default:443.")
 	opensslCmd.PersistentFlags().StringVar(&oc.SslVersion, "ssl_version", "", "openssl/boringssl version， e.g: --ssl_version=\"openssl 1.1.1g\" or  --ssl_version=\"boringssl 1.1.1\"")
+	opensslCmd.PersistentFlags().StringVarP(&config.ProxyConfig.Proxy, "proxy", "", "", "转发到代理")
 
 	rootCmd.AddCommand(opensslCmd)
 }
 
 // openSSLCommandFunc executes the "bash" command.
 func openSSLCommandFunc(command *cobra.Command, args []string) {
+
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 	ctx, cancelFun := context.WithCancel(context.TODO())

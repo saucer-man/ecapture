@@ -17,10 +17,17 @@ package event_processor
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
+	"ecapture/user/config"
+	"time"
+
 	"log"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 )
+
+var client http.Client
 
 type HTTPRequest struct {
 	request    *http.Request
@@ -102,9 +109,45 @@ func (this *HTTPRequest) Reset() {
 }
 
 func (this *HTTPRequest) Display() []byte {
+
 	if this.request.Proto == "HTTP/2.0" {
 		return this.reader.Bytes()
 	}
+	if config.ProxyConfig.Proxy != "" {
+		if client.Timeout != 4*time.Second {
+			var uri, _ = url.Parse(config.ProxyConfig.Proxy)
+			client = http.Client{
+				Transport: &http.Transport{
+					// 设置代理
+					Proxy:           http.ProxyURL(uri),
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+				Timeout: 4 * time.Second,
+			}
+		}
+
+		// We can't have this set. And it only contains "/pkg/net/http/" anyway
+		this.request.RequestURI = ""
+
+		// Since the req.URL will not have all the information set,
+		// such as protocol scheme and host, we create a new URL
+		u, err := url.Parse("https://" + this.request.Host + this.request.RequestURI)
+		if err != nil {
+			panic(err)
+		}
+		this.request.URL = u
+
+		resp, err := client.Do(this.request)
+
+		if err != nil {
+			log.Println("发送失败：")
+			log.Println(err)
+		}
+		defer resp.Body.Close()
+		// data, _ := ioutil.ReadAll(resp.Body)
+		// log.Println("发送成功，返回值：" + string(data))
+	}
+
 	b, e := httputil.DumpRequest(this.request, true)
 	if e != nil {
 		log.Println("DumpRequest error:", e)
